@@ -24,6 +24,7 @@ def main():
 
             # Saving unique starting locations to another path
             unique_locations = df.select("starting_location_name", "starting_location_lat", "starting_location_lon").distinct()
+            unique_locations.show()
             unique_locations.write.csv(path="./mapoutput", mode="overwrite", header=True)
 
     rides.foreachRDD(process_rdd)

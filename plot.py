@@ -1,94 +1,66 @@
 import dash
 from dash import dcc, html
+from dash.dependencies import Input, Output
 import dash_leaflet as dl
 import pandas as pd
 import plotly.graph_objs as go
-from dash.dependencies import Input, Output
 import os
-from plotly.subplots import make_subplots
 
 app = dash.Dash(__name__)
 
-# Define the map component
-def create_map():
-    return dl.Map([
-        dl.TileLayer(),  # This uses the default OpenStreetMap tiles
-        dl.Marker(position=[40.7128, -74.0060], children=[
-            dl.Tooltip("New York City"),
-            dl.Popup("This is NYC")
-        ]),
-        dl.Marker(position=[40.7505, -73.9934], children=[
-            dl.Tooltip("Madison Square Garden"),
-            dl.Popup("Home of the New York Knicks and New York Rangers")
-        ]),
-        dl.Marker(position=[40.8296, -73.9262], children=[
-            dl.Tooltip("Yankee Stadium"),
-            dl.Popup("This is where the New York Yankees play")
-        ])
-    ], style={'width': '1000px', 'height': '500px'}, center=[40.7128, -74.0060], zoom=10)
+def get_latest_csv(directory):
+    """Get the latest CSV file from a specified directory."""
+    all_files = os.listdir(directory)
+    latest_file = max([os.path.join(directory, basename) for basename in all_files])
+    return pd.read_csv(latest_file)
+
+
+# Initial setup for the map component within the layout
+map_component = dl.Map(id='map', style={'width': '1500px', 'height': '500px'}, center=[40.7128, -74.0060], zoom=11, children=[
+    dl.TileLayer()
+])
 
 app.layout = html.Div([
     dcc.Graph(id='live-update-graph'),
-    dcc.Interval(
-        id='interval-component',
-        interval=300,  # in milliseconds
-        n_intervals=0
-    ),
-    # Add the map component here
-    html.Div([
-        create_map()
-    ], style={'marginTop': 20})  # Add some top margin for better spacing
+    dcc.Interval(id='interval-component', interval=1000, n_intervals=0),
+    html.Div([map_component], style={'marginTop': 20})
 ])
 
-def add_emojis_to_locations(df):
-    emoji_map = {
-        'Suburbs': '🏡 Suburbs',
-        'Downtown': '🏙️ Downtown',
-        'Airport': '✈️ Airport'
-    }
-    df['location'] = df['location'].map(emoji_map)
-    return df
-
-@app.callback(Output('live-update-graph', 'figure'),
-              [Input('interval-component', 'n_intervals')])
+@app.callback(
+    [Output('live-update-graph', 'figure'), Output('map', 'children')],
+    [Input('interval-component', 'n_intervals')])
 def update_graph_live(n):
-    path = './sparkoutput'
-    all_files = os.listdir(path)
-    latest = max([os.path.join(path, basename) for basename in all_files])
-    df = pd.read_csv(latest)
-    df = add_emojis_to_locations(df)
+    df = get_latest_csv('./sparkoutput')
+    df['location'] = df['location'].replace({'Suburbs': '🏡 Suburbs', 'Downtown': '🏙️ Downtown', 'Airport': '✈️ Airport'})
+    locations_df = get_latest_csv('./mapoutput')
 
     data = [
-        go.Bar(
-            x=df['location'],
-            y=df['total_rides'],
-            name='🚗 Total Rides',  # Emoji added to label
-            yaxis='y1'
-        ),
-        go.Bar(
-            x=df['location'],
-            y=df['avg_fare'],
-            name='💵 Average Fare',  # Emoji added to label
-            yaxis='y2'
-        )
+        go.Bar(x=df['location'], y=df['total_rides'], name='🚗 Total Rides', yaxis='y1'),
+        go.Bar(x=df['location'], y=df['avg_fare'], name='💵 Average Fare', yaxis='y2')
     ]
 
     layout = go.Layout(
         title='Ride Data Aggregations by Location',
         xaxis=dict(title='Location'),
-        yaxis=dict(
-            title='Total Rides',
-            side='left',
-        ),
-        yaxis2=dict(
-            title='Average Fare',
-            overlaying='y',
-            side='right',
-        ),
+        yaxis=dict(title='Total Rides', side='left'),
+        yaxis2=dict(title='Average Fare', overlaying='y', side='right'),
         barmode='relative'
     )
 
-    return {'data': data, 'layout': layout}
+    # Update the map markers based on the latest location data
+    markers = [
+        dl.Marker(
+            position=[row['starting_location_lat'], row['starting_location_lon']],
+            children=[
+                dl.Tooltip(row['starting_location_name']),
+                dl.Popup(f"This is {row['starting_location_name']}")
+            ]
+        ) for index, row in locations_df.iterrows()
+    ]
+
+    map_children = [dl.TileLayer()] + markers
+
+    return {'data': data, 'layout': layout}, map_children
 
 if __name__ == '__main__':
     app.run_server(debug=True)
