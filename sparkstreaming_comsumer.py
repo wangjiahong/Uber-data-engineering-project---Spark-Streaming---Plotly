@@ -5,9 +5,8 @@ def main():
     spark = SparkSession.builder.appName("RealisticUberRides").getOrCreate()
     sc = spark.sparkContext
     sc.setLogLevel("ERROR")
-    ssc = StreamingContext(sc, 0.3)  # Batch interval of 5 seconds
+    ssc = StreamingContext(sc, 0.3)
 
-    # Listening to the simulated data stream
     rides = ssc.socketTextStream("localhost", 9999)
     
     def process_rdd(time, rdd):
@@ -22,6 +21,10 @@ def main():
             """)
             result.show()
             result.write.csv(path="./sparkoutput", mode="overwrite", header=True)
+
+            # Saving unique starting locations to another path
+            unique_locations = df.select("starting_location_name", "starting_location_lat", "starting_location_lon").distinct()
+            unique_locations.write.csv(path="./mapoutput", mode="overwrite", header=True)
 
     rides.foreachRDD(process_rdd)
 
