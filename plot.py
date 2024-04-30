@@ -19,7 +19,7 @@ map_component = dl.Map(id='map', style={'width': '1500px', 'height': '500px'}, c
 app.layout = html.Div([
     dcc.Graph(id='live-update-graph'),
     dcc.Interval(id='interval-component', interval=1000, n_intervals=0),
-    dcc.Interval(id='fade-interval', interval=100, n_intervals=0),  # Interval for fading effect
+    dcc.Interval(id='fade-interval', interval=1000, n_intervals=1),  # Interval for fading effect
     html.Div([map_component], style={'marginTop': 20})
 ])
 
