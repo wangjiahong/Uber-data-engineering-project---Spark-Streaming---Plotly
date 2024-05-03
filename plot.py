@@ -34,7 +34,7 @@ app.layout = html.Div([
 def update_graph_live(n):
     df = get_latest_csv('./sparkoutput')
     df['location'] = df['location'].replace({'Suburbs': '🏡 Suburbs', 'Downtown': '🏙️ Downtown', 'Airport': '✈️ Airport'})
-    locations_df = get_latest_csv('./mapoutput')
+    locations_df = get_latest_csv('./mapoutput').sample(n=5)
 
     data = [
         go.Bar(x=df['location'], y=df['total_rides'], name='🚗 Total Rides', yaxis='y1'),
